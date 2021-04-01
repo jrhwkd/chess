@@ -55,8 +55,8 @@ class GamePiece
 end
 
 class King < GamePiece
-  attr_reader :color, :symbol, :space, :all_moves, :name
-  attr_accessor :moves
+  attr_reader :color, :symbol, :all_moves, :name, :moved
+  attr_accessor :moves, :space
   include KingData
   def initialize(space, is_player_1)
     @name = "king"
@@ -70,8 +70,8 @@ class King < GamePiece
 end
 
 class Queen < GamePiece
-  attr_reader :color, :space, :symbol, :all_moves, :name
-  attr_accessor :moves
+  attr_reader :color, :symbol, :all_moves, :name
+  attr_accessor :moves, :space
   include QueenData
   def initialize(space, is_player_1)
     @name = "queen"
@@ -84,8 +84,8 @@ class Queen < GamePiece
 end
 
 class Bishop < GamePiece
-  attr_reader :color, :space, :symbol, :all_moves, :name
-  attr_accessor :moves
+  attr_reader :color, :symbol, :all_moves, :name
+  attr_accessor :moves, :space
   include BishopData
   def initialize(space, is_player_1)
     @name = "bishop"
@@ -98,8 +98,8 @@ class Bishop < GamePiece
 end
 
 class Knight < GamePiece
-  attr_reader :color, :space, :symbol, :all_moves, :name
-  attr_accessor :moves
+  attr_reader :color, :symbol, :all_moves, :name
+  attr_accessor :moves, :space
   include KnightData
   def initialize(space, is_player_1)
     @name = "knight"
@@ -112,8 +112,8 @@ class Knight < GamePiece
 end
 
 class Rook < GamePiece
-  attr_reader :color, :space, :symbol, :all_moves, :name
-  attr_accessor :moves
+  attr_reader :color, :symbol, :all_moves, :name
+  attr_accessor :moves, :moved, :space
   include RookData
   def initialize(space, is_player_1)
     @name = "rook"
@@ -127,8 +127,8 @@ class Rook < GamePiece
 end
 
 class Pawn < GamePiece
-  attr_reader :color, :space, :symbol, :all_moves, :name, :all_attacks
-  attr_accessor :moves, :attacks
+  attr_reader :color, :symbol, :all_moves, :name, :all_attacks
+  attr_accessor :moves, :attacks, :num_of_moves, :enpassant_moves, :space
   include PawnData
   def initialize(space, is_player_1)
     @name = "pawn"
@@ -139,6 +139,8 @@ class Pawn < GamePiece
     @color == "blue" ? @all_attacks = POSSIBLE_ATTACKS : @all_attacks = switch_direction(POSSIBLE_ATTACKS)
     @attacks = []
     @moves = calc_moves(@space, @all_moves)
+    @enpassant_moves = []
+    @num_of_moves = 0
   end
 
   def switch_direction(moves)
