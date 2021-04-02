@@ -5,6 +5,7 @@
 
 require_relative './chess_data.rb'
 require_relative './game_pieces.rb'
+require 'pry'
 
 class Player
   @@player_num = 1
@@ -12,7 +13,7 @@ class Player
   def initialize(name)
     @name = name
     @number = @@player_num
-    @@player_num == 1? @color = "blue" : @color = "red"
+    @@player_num == 1 ? @color = "blue" : @color = "red"
     @@player_num += 1
   end
 end
@@ -101,7 +102,7 @@ class Board
   def create_row(start, finish)
     row = []
     (start..finish).each do |cell|
-      @board[cell].value != nil ? row.push(@board[cell].value.symbol) : row.push(' ')
+      @board[cell].value != nil ? row.push(@board[cell].value.symbol) : row.push('  ')
     end
     return row
   end
@@ -113,11 +114,11 @@ class Board
   end
 
   def print_separator
-    puts "   -------------------------------"
+    puts "   ----------------------------------------"
   end
 
   def print_header
-    puts "    a   b   c   d   e   f   g   h"
+    puts "     a    b    c    d    e    f    g    h"
   end
 end
 
@@ -130,6 +131,7 @@ class Game < GamePiece
     @board = Board.new
     @player_1 = get_player(1)
     @player_2 = get_player(2)
+    @players = [@player_1, @player_2]
     @king_1 = find_king(@player_1)
     @king_2 = find_king(@player_2)
   end
@@ -137,7 +139,8 @@ class Game < GamePiece
   def get_player(player_num)
     player_num == 1 ? color = "\e[34mblue\e[0m" : color = "\e[31mred\e[0m"
     puts "Player #{player_num}, what is your name?"
-    name = gets.chomp
+    name = ""
+    name = gets.chomp until name != ""
     puts "#{name}, you are team #{player_num}, and your team color is #{color}!\n\n"
     return Player.new(name)
     #sleep 1
@@ -158,11 +161,21 @@ class Game < GamePiece
   def check?
     @is_player_1 ? king = @king_2 : king = @king_1
     @is_player_1 ? king_color = "red" : king_color = "blue"
+    return check_check(king, king_color)
+  end
+
+  def self_check?
+    @is_player_1 ? king = @king_1 : king = @king_2
+    @is_player_1 ? king_color = "blue" : king_color = "red"
+    return check_check(king, king_color)
+  end
+
+  def check_check(king, king_color)
     @board.board.each do |cell|
       if !cell.value.nil? && cell.value.color != king_color
         cell.value.moves.each do |move|
           if move == king.space
-            puts "\n#{king} is under check!"
+            puts "\n#{king_color} #{king.name} is under check!"
             return true
           end
         end
@@ -172,22 +185,106 @@ class Game < GamePiece
   end
 
   def checkmate?
+    result = false
     @is_player_1 ? king = @king_2 : king = @king_1
     check_mate_spaces = [king.space]
+    attacking_pieces = []
+    stalemate?
     @board.board.each do |cell|
       if !cell.value.nil?
         cell.value.moves.each do |move|
-          check_mate_spaces.push(move) if king.moves.include?(move)
+          if king.moves.include?(move)
+            check_mate_spaces.push(move) 
+            attacking_pieces.push(cell.value)
+          end
         end
       end
     end
-    king.moves.sort == check_mate_spaces.sort ? true : false
+    king.moves.sort == check_mate_spaces.sort ? result = true : result = false
+    @board.board.each do |cell|
+      if !cell.value.nil?
+        attacking_pieces.each do |piece|
+          next if cell.value = piece
+          cell.value.moves.each do |move|
+            if piece.space == move
+              result = false
+              break
+            end
+          end
+        end
+      end
+    end
+    return result
+  end
+
+  def stalemate?
+    @is_player_1 ? player = @player_1 : player = @player_2
+    all_player_moves = []
+    @board.board.each do |cell|
+      if !cell.value.nil?
+        if cell.value.name == "pawn"
+          cell.value.moves = calc_pawn_moves(cell.value)
+        else
+          cell.value.moves = calc_moves(cell.space, cell.value.all_moves)
+        end
+        delete_moves(cell.value)
+        all_player_moves.push(cell.value.moves) if cell.value.color == player.color
+      end
+    end
+    all_player_moves.empty? && !self_check? ? true : false
+  end
+
+  def dead?
+    dead = false
+    all_player_pieces = []
+    all_player_moves = []
+    @players.each do |player|
+      player_pieces = []
+      player_moves = []
+      @board.board.each do |cell|
+        if !cell.value.nil?
+          if cell.value.color == player.color
+            cell.value.moves.each { |move| player_moves.push(move) }
+            player_pieces.push(cell.value)
+          end
+        end
+      end
+      all_player_moves.push(player_moves)
+    end
+    if all_player_pieces[0][0].name == "king" && all_player_pieces[1][0].name == "king"
+      dead = true
+    end
+  end
+
+  def delete_moves(piece)
+    piece.moves.each do |move|
+      piece.moves.delete(move) if !check_path?(piece.space, move)
+      if !@board.board[BOARD_MAPPING[move]].value.nil?
+        if @board.board[BOARD_MAPPING[move]].value.color == piece.color
+          piece.moves.delete(move)
+        end
+      end
+      if piece.name == "king"
+        @board.board.each do |cell|
+          if !cell.value.nil?
+            if cell.value.color != piece.color && cell.value.moves.include?(move)
+              piece.moves.delete(move)
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def end_game_draw
+    @board.board.display_board
+    puts "Game ends in a draw."
   end
 
   def end_game_winner
     @board.display_board
-    @is_player_1 ? player_num = "1" : player_num = "2"
-    puts "\nCheckmate!\n\nPlayer #{player_num} wins!"
+    @is_player_1 ? player = @player_1 : player = @player_2
+    puts "\nCheckmate!\n\nPlayer #{player.name} wins!"
   end
 
   def play
@@ -195,20 +292,23 @@ class Game < GamePiece
     until checkmate?
       @board.display_board
 
-      # get piece
+      break if stalemate?
+
+    # get piece
       piece_board_index = get_piece
       piece = @board.board[piece_board_index].value
       
-      # calc piece moves
+    # calc piece moves
       if piece.name == 'pawn'
         calc_pawn_moves(piece)
       else
         piece.moves = calc_moves(piece.space, piece.all_moves)
       end
       
+      delete_moves(piece)
       display_moves(piece)
 
-      # get move
+    # get move
       if piece.name == "pawn"
         # en passant
         move_to_space = get_move(piece)
@@ -241,7 +341,7 @@ class Game < GamePiece
         next if move_to_space.nil?
       end
 
-      # check move
+    # check move
       if piece.name == "knight"
         until check_move?(piece, move_to_space)
           move_to_space = re_run_check(piece)
@@ -256,18 +356,17 @@ class Game < GamePiece
         next if move_to_space.nil?
       end
 
-      # en passant
-      # promotion
-
+    # update board
       update_board(piece, move_to_space) if !move_to_space.nil?  
 
       break if checkmate?
+      break if draw?
       check?
 
       switch_player
     end
     end_game_winner if checkmate?
-    # end_game_draw if !checkmate?
+    end_game_draw if stalemate? || dead?
   end 
 
   def get_column
@@ -336,7 +435,7 @@ class Game < GamePiece
     return space
   end
 
-  def re_run_check(piece)(piece)
+  def re_run_check(piece)
     @is_player_1 ? player = @player_1 : player = @player_2
     puts "\nThat move isn't legal, please enter a legal move."
     puts "To choose a different piece, type 'back'."
@@ -369,6 +468,7 @@ class Game < GamePiece
       check_space[1] = check_space[1] + path[1][i] if !path[1][i].nil?
       #p "check_space looped #{check_space}"
       next if check_space == target
+      binding.pry
       pass = @board.board[BOARD_MAPPING[check_space]].value.nil?
       return false if pass == false
     end
@@ -403,6 +503,8 @@ class Game < GamePiece
     move_to_index = BOARD_MAPPING[move_to_space]
     piece_index = BOARD_MAPPING[piece.space]
     piece.num_of_moves += 1 if piece.name == "pawn"
+    @king_1 = find_king(@player_1)
+    @king_2 = find_king(@player_2)
     piece.space = move_to_space
     @board.board[move_to_index].value = piece
     @board.board[piece_index].value = nil
@@ -437,6 +539,8 @@ class Game < GamePiece
     piece.moved = true if piece.name == "king"
     piece.moved = true if piece.name == "rook"
     piece.num_of_moves += 1 if piece.name == "pawn"
+    @king_1 = find_king(@player_1)
+    @king_2 = find_king(@player_2)
     piece.space = move_to_space
     @board.board[move_to_index].value = piece
     @board.board[piece_index].value = nil
@@ -540,7 +644,6 @@ class Game < GamePiece
         @board.board[60].value = nil
       end
     end
-    return true
   end
 end
 
