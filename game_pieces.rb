@@ -112,8 +112,8 @@ class Knight < GamePiece
 end
 
 class Rook < GamePiece
-  attr_reader :color, :symbol, :all_moves, :name
-  attr_accessor :moves, :moved, :space
+  attr_reader :color, :symbol, :all_moves, :name, :moved
+  attr_accessor :moves, :space
   include RookData
   def initialize(space, is_player_1)
     @name = "rook"

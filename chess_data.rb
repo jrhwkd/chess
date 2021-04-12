@@ -134,37 +134,40 @@ module BasicSerialization
         # board.board instance variable
         sub_board_array = []
         @board.board.each do |cell|
+          cell_obj = {}
           cell_var = {}
-          binding.pry
-          cell.instance_variables.each do |var|
-            if var == :@space
-              cell_var[var] = instance_variable_get(var)
-            else
-              value = {}
-              var.instance_variables.each do |value_var|
-                value[value_var] = instance_variable_get(value_var)
-              end
-              cell_var[var] = value
-            end
+          #binding.pry
+          cell_var[:@space] = cell.space
+          if cell.value == nil
+            cell_var[:@value] = nil
+          else
+            cell_value = {}
+            cell_value[:@name] = cell.value.name
+            cell_value[:@color] = cell.value.color
+            cell_value[:@space] = cell.value.space
+            cell_value[:@symbol] = cell.value.symbol
+            cell_value[:@all_moves] = cell.value.all_moves
+            cell_value[:@moves] = cell.value.moves
+            cell_value[:@moved] = cell.value.moved if defined?(cell.value.moved)
+            cell_var[:@value] = cell_value
           end
-          sub_board_array.push(cell_var)
+          cell_obj[cell] = cell_var
+          sub_board_array.push(cell_obj)
         end
         board[board] = sub_board_array
         obj[var] = board
       elsif var == :@player_1 || var == :@player_2
         player_var = {}
-        var.instance_variables.each do |var|
-          player_var[var] = instance_variable_get(var)
-        end
+        var == :@player_1 ? player = @player_1 : player = @player_2
+        player_var[:@name] = player.name
+        player_var[:@number] = player.number
+        player_var[:@color] = player.color
         obj[var] = player_var
       elsif var == :@players
-        obj[var] = instance_variable_get(var)
+        obj[var] = [:@player_1, :@player_2]
       elsif var == :@king_1 || var == :@king_2
-        value = {}
-        var.instance_variables.each do |value_var|
-          value[value_var] = instance_variable_get(value_var)
-        end
-        obj[var] = value
+        var == :@king_1 ? king = @king_1 : king = @king_2
+        obj[var] = king
       end
     end
     @@serializer.dump obj
