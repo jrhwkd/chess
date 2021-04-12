@@ -123,17 +123,79 @@ class Board
 end
 
 class Game < GamePiece
-  attr_reader :is_player_1
+  attr_reader :is_player_1, :board, :player_1, :player_2, :players, :king_1, :king_2
   attr_accessor 
   include BoardMapping
+  include BasicSerialization
   def initialize
     @is_player_1 = true
-    @board = Board.new
-    @player_1 = get_player(1)
-    @player_2 = get_player(2)
-    @players = [@player_1, @player_2]
-    @king_1 = find_king(@player_1)
-    @king_2 = find_king(@player_2)
+    @board
+    @player_1
+    @player_2
+    @players
+    @king_1
+    @king_2
+  end
+  
+  def introduction
+    puts "\nLet's play Chess!\n\n"
+  end
+
+  def save_game
+    j = 1
+    Dir.mkdir("saved_games") unless File.exists?("saved_games")
+    while File.exists?("saved_games/chess_#{j}.txt")
+      j +=1
+    end
+    saved_game = File.open("saved_games/chess_#{j}.txt", "w")
+    saved_game.puts serialize
+    puts "\nGame saved as chess_#{j}!"
+  end
+
+  def save_game_check
+    puts "Would you like to save your game? Y or N?"
+    input = ""
+    until input == "y" || input == "n"
+      input = gets.chomp.downcase
+      if input == "y"
+        save_game
+      elsif input == "n"
+        return
+      else
+        puts "Hmm, I don't know that command, try again."
+      end
+    end
+  end
+
+  def quit_game?
+    puts "\nTo quit, enter \'quit\', or press enter to continue."
+    input = ""
+    input = gets.chomp.downcase
+    if input == "quit"
+      puts "\nSee you later!"
+      return true
+    else
+      return false
+    end
+  end
+
+  def load_game
+    input = ""
+    until input == "y" || input == "n"
+      puts "Would you like to load a saved game? Y or N?"
+      input = gets.chomp.downcase
+      if input == "y"
+        puts "\nWhich game?"
+        input = gets.chomp.downcase
+        saved_game = File.open("saved_games/#{input}.txt", "r")
+        unserialize(saved_game.gets)
+        return true
+      elsif input == "n"
+        return false
+      else
+        puts "\nHmm, I don't know that command, try again.\n\n"
+      end
+    end
   end
 
   def get_player(player_num)
@@ -187,11 +249,12 @@ class Game < GamePiece
   def checkmate?
     result = false
     @is_player_1 ? king = @king_2 : king = @king_1
-    check_mate_spaces = [king.space]
+    check_mate_spaces = []
+    check_mate_spaces.push(king.space)
     attacking_pieces = []
     stalemate?
     @board.board.each do |cell|
-      if !cell.value.nil?
+      if !cell.value.nil? && cell.value.color != king.color
         cell.value.moves.each do |move|
           if king.moves.include?(move)
             check_mate_spaces.push(move) 
@@ -204,7 +267,7 @@ class Game < GamePiece
     @board.board.each do |cell|
       if !cell.value.nil?
         attacking_pieces.each do |piece|
-          next if cell.value = piece
+          next if cell.value == piece
           cell.value.moves.each do |move|
             if piece.space == move
               result = false
@@ -251,13 +314,14 @@ class Game < GamePiece
       end
       all_player_moves.push(player_moves)
     end
-    if all_player_pieces[0][0].name == "king" && all_player_pieces[1][0].name == "king"
+    if !all_player_pieces.empty? && all_player_pieces[0][0].name == "king" && all_player_pieces[1][0].name == "king"
       dead = true
     end
   end
 
   def delete_moves(piece)
     piece.moves.each do |move|
+      #binding.pry
       piece.moves.delete(move) if !check_path?(piece.space, move)
       if !@board.board[BOARD_MAPPING[move]].value.nil?
         if @board.board[BOARD_MAPPING[move]].value.color == piece.color
@@ -277,7 +341,7 @@ class Game < GamePiece
   end
 
   def end_game_draw
-    @board.board.display_board
+    @board.display_board
     puts "Game ends in a draw."
   end
 
@@ -288,11 +352,24 @@ class Game < GamePiece
   end
 
   def play
-    #intro
+    introduction
+    if !load_game
+      @board = Board.new
+      @player_1 = get_player(1)
+      @player_2 = get_player(2)
+      @players = [@player_1, @player_2]
+      @king_1 = find_king(@player_1)
+      @king_2 = find_king(@player_2)
+    end
+
+    binding.pry
+
     until checkmate?
       @board.display_board
-
       break if stalemate?
+
+      save_game_check
+      break if quit_game?
 
     # get piece
       piece_board_index = get_piece
@@ -360,7 +437,7 @@ class Game < GamePiece
       update_board(piece, move_to_space) if !move_to_space.nil?  
 
       break if checkmate?
-      break if draw?
+      break if dead?
       check?
 
       switch_player
@@ -459,18 +536,19 @@ class Game < GamePiece
     path[0] = (steps[0]..0).to_a if steps[0] < 0
     path[1] = (steps[1]..0).to_a if steps[1] < 0
     #p "path #{path}"
-    steps.max.abs > steps.min.abs ? i = steps.max.abs - 1 : i = steps.min.abs - 1
-    #p "i #{i}"
+    steps.max.abs > steps.min.abs ? n = steps.max.abs - 1 : n = steps.min.abs - 1
+    #p "n #{n}"
     check_space = start.clone
     #p "check_space #{check_space}"
-    for i in 1..i do
-      check_space[0] = check_space[0] + path[0][i] if !path[0][i].nil?
-      check_space[1] = check_space[1] + path[1][i] if !path[1][i].nil?
+    for i in 1..n do
+      check_space[0] = start[0] + path[0][i] if !path[0][i].nil?
+      check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
       #p "check_space looped #{check_space}"
       next if check_space == target
-      binding.pry
-      pass = @board.board[BOARD_MAPPING[check_space]].value.nil?
-      return false if pass == false
+      #binding.pry
+      cell = @board.board[BOARD_MAPPING[check_space]].clone
+      check_space_value = cell.value
+      return false if !check_space_value.nil?
     end
     return true
   end
@@ -517,6 +595,7 @@ class Game < GamePiece
     puts "\nPawn has been promoted!"
     puts "What would you like pawn to be promoted to?"
     puts "Enter: queen, bishop, knight, or rook"
+    promoted_to = ""
     until promoted_to == "queen" || promoted_to == "knight" || promoted_to == "bishop" || promoted_to == "rook"
       promoted_to = gets.chomp.downcase
     end

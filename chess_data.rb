@@ -1,3 +1,5 @@
+require 'json'
+
 def create_all_spaces
   spaces = (0..7).to_a
   board = {}
@@ -57,40 +59,40 @@ module KingData
   KING_MOVE_DIRECTIONS = (-1..1).to_a
   POSSIBLE_MOVES = create_king_moves(KING_MOVE_DIRECTIONS)
   POSSIBLE_ATTACKS = POSSIBLE_MOVES
-  SYMBOL = "\u265a"
+  SYMBOL = "Kg" #"\u265a"
 end
 
 module QueenData
   QUEEN_MOVE_DIRECTIONS = (-7..7).to_a
   POSSIBLE_MOVES = create_queen_moves(QUEEN_MOVE_DIRECTIONS)
   POSSIBLE_ATTACKS = POSSIBLE_MOVES
-  SYMBOL = "\u2655"
+  SYMBOL = "Qn" #"\u2655"
 end
 
 module BishopData
   BISHOP_MOVE_DIRECTIONS = (-7..7).to_a
   POSSIBLE_MOVES = create_bishop_moves(BISHOP_MOVE_DIRECTIONS)
   POSSIBLE_ATTACKS = POSSIBLE_MOVES
-  SYMBOL = "\u2657"
+  SYMBOL = "Bp" #"\u2657"
 end
 
 module KnightData
   POSSIBLE_MOVES = [[-2, 1], [-1, 2], [1, 2], [2, 1], [-2, -1], [-1, -2], [1, -2], [2, -1]]
   POSSIBLE_ATTACKS = POSSIBLE_MOVES
-  SYMBOL = "\u2658"
+  SYMBOL = "Kn" #"\u2658"
 end
 
 module RookData
   ROOK_MOVE_DIRECTIONS = (-7..7).to_a
   POSSIBLE_MOVES = create_rook_moves(ROOK_MOVE_DIRECTIONS)
   POSSIBLE_ATTACKS = POSSIBLE_MOVES
-  SYMBOL = "\u2656"
+  SYMBOL = "Rk" #"\u2656"
 end
 
 module PawnData
   POSSIBLE_MOVES = [[0, 1], [0, 2]]
   POSSIBLE_ATTACKS = [[-1, 1], [1, 1]]
-  SYMBOL = "\u2659"
+  SYMBOL = "pn" #"\u2659"
 end
 
 module BoardMapping
@@ -117,6 +119,63 @@ module BoardMapping
   }
 
   BOARD_MAPPING = create_all_spaces
+end
+
+module BasicSerialization
+  @@serializer = JSON
+
+  def serialize
+    obj = {}
+    instance_variables.each do |var|
+      if var == :@is_player_1
+        obj[var] = instance_variable_get(var)
+      elsif var == :@board
+        board = {}
+        # board.board instance variable
+        sub_board_array = []
+        @board.board.each do |cell|
+          cell_var = {}
+          binding.pry
+          cell.instance_variables.each do |var|
+            if var == :@space
+              cell_var[var] = instance_variable_get(var)
+            else
+              value = {}
+              var.instance_variables.each do |value_var|
+                value[value_var] = instance_variable_get(value_var)
+              end
+              cell_var[var] = value
+            end
+          end
+          sub_board_array.push(cell_var)
+        end
+        board[board] = sub_board_array
+        obj[var] = board
+      elsif var == :@player_1 || var == :@player_2
+        player_var = {}
+        var.instance_variables.each do |var|
+          player_var[var] = instance_variable_get(var)
+        end
+        obj[var] = player_var
+      elsif var == :@players
+        obj[var] = instance_variable_get(var)
+      elsif var == :@king_1 || var == :@king_2
+        value = {}
+        var.instance_variables.each do |value_var|
+          value[value_var] = instance_variable_get(value_var)
+        end
+        obj[var] = value
+      end
+    end
+    @@serializer.dump obj
+  end
+
+  def unserialize(string)
+    obj = @@serializer.parse(string)
+    obj.keys.each do |key|
+      instance_variable_set(key, obj[key])
+    end
+  end
 end
 
 # class String
