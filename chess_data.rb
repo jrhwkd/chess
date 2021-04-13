@@ -130,16 +130,13 @@ module BasicSerialization
       if var == :@is_player_1
         obj[var] = instance_variable_get(var)
       elsif var == :@board
-        board = {}
-        # board.board instance variable
-        sub_board_array = []
+        board = []
         @board.board.each do |cell|
           cell_obj = {}
-          cell_var = {}
           #binding.pry
-          cell_var[:@space] = cell.space
+          cell_obj[:@space] = cell.space
           if cell.value == nil
-            cell_var[:@value] = nil
+            cell_obj[:@value] = nil
           else
             cell_value = {}
             cell_value[:@name] = cell.value.name
@@ -149,12 +146,10 @@ module BasicSerialization
             cell_value[:@all_moves] = cell.value.all_moves
             cell_value[:@moves] = cell.value.moves
             cell_value[:@moved] = cell.value.moved if defined?(cell.value.moved)
-            cell_var[:@value] = cell_value
+            cell_obj[:@value] = cell_value
           end
-          cell_obj[cell] = cell_var
-          sub_board_array.push(cell_obj)
+          board.push(cell_obj)
         end
-        board[board] = sub_board_array
         obj[var] = board
       elsif var == :@player_1 || var == :@player_2
         player_var = {}
@@ -176,8 +171,45 @@ module BasicSerialization
   def unserialize(string)
     obj = @@serializer.parse(string)
     obj.keys.each do |key|
+      binding.pry
       instance_variable_set(key, obj[key])
     end
+    
+    # set board
+    loaded_board = []
+    @board.each do |cell|
+      space = cell["@space"]
+      value = cell["@value"]
+      if value == nil
+        piece = nil
+      else
+        value["@color"] == "blue" ? is_player_1 = true : is_player_1 = false
+        case value["@name"]
+        when "king"
+          piece = King.new(space, is_player_1)
+        when "queen"
+          piece = Queen.new(space, is_player_1)
+        when "bishop"
+          piece = Bishop.new(space, is_player_1)
+        when "knight"
+          piece = Knight.new(space, is_player_1)
+        when "rook"
+          piece = Rook.new(space, is_player_1)
+        when "pawn"
+          piece = Pawn.new(space, is_player_1)
+        end
+      end
+      loaded_board.push(Cell.new(space, piece))
+      @board = Board.new
+      @board.board = loaded_board
+    end
+
+    #set player 1
+    player_1_name = @player_1["@name"]
+    
+    @player_1.keys.each do |key|
+      @player_1.instance_variable_set()
+    binding.pry
   end
 end
 

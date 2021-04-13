@@ -19,7 +19,7 @@ class Player
 end
 
 class Board
-  attr_reader :board
+  attr_accessor :board
   def initialize()
     @board = new_board
   end
@@ -186,7 +186,7 @@ class Game < GamePiece
       input = gets.chomp.downcase
       if input == "y"
         puts "\nWhich game?"
-        input = gets.chomp.downcase
+        input = gets.chomp.downcase until File.exist?("saved_games/#{input}.txt")
         saved_game = File.open("saved_games/#{input}.txt", "r")
         unserialize(saved_game.gets)
         return true
