@@ -323,8 +323,6 @@ class Game < GamePiece
   def delete_moves(piece)
      if !piece.moves.nil? 
       piece.moves.each do |move|
-        p piece.moves
-        p move
         if piece.name != "knight" && !check_path?(piece.space, move)
           piece.moves.delete(move)
         end
