@@ -10,9 +10,9 @@ require 'pry'
 class Player
   @@player_num = 1
   attr_reader :name, :number, :color
-  def initialize(name)
+  def initialize(name, number = @@player_num)
     @name = name
-    @number = @@player_num
+    @number = number
     @@player_num == 1 ? @color = "blue" : @color = "red"
     @@player_num += 1
   end
@@ -186,6 +186,7 @@ class Game < GamePiece
       input = gets.chomp.downcase
       if input == "y"
         puts "\nWhich game?"
+        Dir.glob("saved_games/*").each { |file| puts file }
         input = gets.chomp.downcase until File.exist?("saved_games/#{input}.txt")
         saved_game = File.open("saved_games/#{input}.txt", "r")
         unserialize(saved_game.gets)
@@ -320,19 +321,24 @@ class Game < GamePiece
   end
 
   def delete_moves(piece)
-    piece.moves.each do |move|
-      #binding.pry
-      piece.moves.delete(move) if !check_path?(piece.space, move)
-      if !@board.board[BOARD_MAPPING[move]].value.nil?
-        if @board.board[BOARD_MAPPING[move]].value.color == piece.color
+     if !piece.moves.nil? 
+      piece.moves.each do |move|
+        p piece.moves
+        p move
+        if piece.name != "knight" && !check_path?(piece.space, move)
           piece.moves.delete(move)
         end
-      end
-      if piece.name == "king"
-        @board.board.each do |cell|
-          if !cell.value.nil?
-            if cell.value.color != piece.color && cell.value.moves.include?(move)
-              piece.moves.delete(move)
+        if !@board.board[BOARD_MAPPING[move]].value.nil?
+          if @board.board[BOARD_MAPPING[move]].value.color == piece.color
+            piece.moves.delete(move)
+          end
+        end
+        if piece.name == "king"
+          @board.board.each do |cell|
+            if !cell.value.nil?
+              if cell.value.color != piece.color && !cell.value.moves.nil? && cell.value.moves.include?(move)
+                piece.moves.delete(move)
+              end
             end
           end
         end
@@ -374,9 +380,9 @@ class Game < GamePiece
     # get piece
       piece_board_index = get_piece
       piece = @board.board[piece_board_index].value
-      
+
     # calc piece moves
-      if piece.name == 'pawn'
+      if piece.name == "pawn"
         calc_pawn_moves(piece)
       else
         piece.moves = calc_moves(piece.space, piece.all_moves)
@@ -387,7 +393,6 @@ class Game < GamePiece
 
     # get move
       if piece.name == "pawn"
-        # en passant
         move_to_space = get_move(piece)
         next if move_to_space.nil?
         if piece.enpassant_moves.include?(move_to_space)
@@ -545,7 +550,7 @@ class Game < GamePiece
       check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
       #p "check_space looped #{check_space}"
       next if check_space == target
-      #binding.pry
+      # binding.pry
       cell = @board.board[BOARD_MAPPING[check_space]].clone
       check_space_value = cell.value
       return false if !check_space_value.nil?
@@ -568,19 +573,21 @@ class Game < GamePiece
     adjacent_cell_right = @board.board[piece_index + 1].value
     adjacent_cell_left = @board.board[piece_index - 1].value
     @is_player_1 ? operator = 1 : operator = -1
-    if !adjacent_cell_right.nil? && adjacent_cell_right.color != piece.color && adjacent_cell_right.name == 'pawn' && adjacent_cell_right.num_of_moves == 1
+    @is_player_1 ? legal_row = 4 : legal_row = 5
+    if !adjacent_cell_right.nil? && adjacent_cell_right.color != piece.color && adjacent_cell_right.name == 'pawn' && adjacent_cell_right.num_of_moves == 1 && piece.space[1] == legal_row
       piece.enpassant_moves.push([adjacent_cell_right.space[0], adjacent_cell_right.space[1] + operator])
     end
-    if !adjacent_cell_left.nil? && adjacent_cell_left.color != piece.color && adjacent_cell_left.name == 'pawn' && adjacent_cell_left.num_of_moves == 1
+    if !adjacent_cell_left.nil? && adjacent_cell_left.color != piece.color && adjacent_cell_left.name == 'pawn' && adjacent_cell_left.num_of_moves == 1 && piece.space[1] == legal_row
       piece.enpassant_moves.push([adjacent_cell_left.space[0], adjacent_cell_left.space[1] + operator])
     end
     (piece.enpassant_moves).each { |move| piece.moves.push(move) }
+    piece.moves = piece.moves.uniq
   end
 
   def update_board_enpassant(piece, move_to_space)
     move_to_index = BOARD_MAPPING[move_to_space]
     piece_index = BOARD_MAPPING[piece.space]
-    piece.num_of_moves += 1 if piece.name == "pawn"
+    piece.num_of_moves += 1
     @king_1 = find_king(@player_1)
     @king_2 = find_king(@player_2)
     piece.space = move_to_space
@@ -615,8 +622,8 @@ class Game < GamePiece
   def update_board(piece, move_to_space)
     move_to_index = BOARD_MAPPING[move_to_space]
     piece_index = BOARD_MAPPING[piece.space]
-    piece.moved = true if piece.name == "king"
-    piece.moved = true if piece.name == "rook"
+    piece.moved == true if piece.name == "king"
+    piece.moved == true if piece.name == "rook"
     piece.num_of_moves += 1 if piece.name == "pawn"
     @king_1 = find_king(@player_1)
     @king_2 = find_king(@player_2)

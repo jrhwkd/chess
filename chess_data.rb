@@ -133,7 +133,6 @@ module BasicSerialization
         board = []
         @board.board.each do |cell|
           cell_obj = {}
-          #binding.pry
           cell_obj[:@space] = cell.space
           if cell.value == nil
             cell_obj[:@value] = nil
@@ -146,6 +145,7 @@ module BasicSerialization
             cell_value[:@all_moves] = cell.value.all_moves
             cell_value[:@moves] = cell.value.moves
             cell_value[:@moved] = cell.value.moved if defined?(cell.value.moved)
+            cell_value[:@num_of_moves] = cell.value.num_of_moves if defined?(cell.value.num_of_moves)
             cell_obj[:@value] = cell_value
           end
           board.push(cell_obj)
@@ -171,7 +171,6 @@ module BasicSerialization
   def unserialize(string)
     obj = @@serializer.parse(string)
     obj.keys.each do |key|
-      binding.pry
       instance_variable_set(key, obj[key])
     end
     
@@ -196,20 +195,28 @@ module BasicSerialization
         when "rook"
           piece = Rook.new(space, is_player_1)
         when "pawn"
-          piece = Pawn.new(space, is_player_1)
+          piece = Pawn.new(space, is_player_1, value["@num_of_moves"])
         end
       end
       loaded_board.push(Cell.new(space, piece))
-      @board = Board.new
-      @board.board = loaded_board
     end
+    @board = Board.new
+    @board.board = loaded_board
 
-    #set player 1
+    # set player 1
     player_1_name = @player_1["@name"]
+    @player_1 = Player.new(player_1_name, 1)
     
-    @player_1.keys.each do |key|
-      @player_1.instance_variable_set()
-    binding.pry
+    # set player 2
+    player_2_name = @player_2["@name"]
+    @player_2 = Player.new(player_2_name, 2)
+
+    # set players
+    @players = [@player_1, @player_2]
+
+    # find kings
+    @king_1 = find_king(@player_1)
+    @king_2 = find_king(@player_2)
   end
 end
 

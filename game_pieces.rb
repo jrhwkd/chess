@@ -130,7 +130,7 @@ class Pawn < GamePiece
   attr_reader :color, :symbol, :all_moves, :name, :all_attacks
   attr_accessor :moves, :attacks, :num_of_moves, :enpassant_moves, :space
   include PawnData
-  def initialize(space, is_player_1)
+  def initialize(space, is_player_1, num_of_moves = 0)
     @name = "pawn"
     @color = select_color(is_player_1)
     @space = space
@@ -140,7 +140,7 @@ class Pawn < GamePiece
     @attacks = []
     @moves = calc_moves(@space, @all_moves)
     @enpassant_moves = []
-    @num_of_moves = 0
+    @num_of_moves = num_of_moves
   end
 
   def switch_direction(moves)
