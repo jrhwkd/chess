@@ -257,14 +257,17 @@ class Game < GamePiece
     @board.board.each do |cell|
       if !cell.value.nil? && cell.value.color != king.color
         cell.value.moves.each do |move|
-          if king.moves.include?(move)
+          if king.moves.include?(move) || move == king.space
             check_mate_spaces.push(move) 
             attacking_pieces.push(cell.value)
           end
         end
       end
     end
-    king.moves.sort == check_mate_spaces.sort ? result = true : result = false
+    binding.pry
+    king.moves.each do |move|
+      check_mate_spaces.include?(move) ? result = true : result = false
+    end
     @board.board.each do |cell|
       if !cell.value.nil?
         attacking_pieces.each do |piece|
@@ -439,7 +442,6 @@ class Game < GamePiece
     # update board
       update_board(piece, move_to_space) if !move_to_space.nil?  
 
-      break if checkmate?
       break if dead?
       check?
 
