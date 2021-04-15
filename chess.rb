@@ -154,12 +154,12 @@ class Game < GamePiece
 
   def save_game_check
     puts "Would you like to save your game? Y or N?"
-    input = ""
-    until input == "y" || input == "n"
+    input = "player input"
+    until input == "y" || input == "n" || input == ""
       input = gets.chomp.downcase
       if input == "y"
         save_game
-      elsif input == "n"
+      elsif input == "n" || input == ""
         return
       else
         puts "Hmm, I don't know that command, try again."
@@ -201,10 +201,16 @@ class Game < GamePiece
 
   def get_player(player_num)
     player_num == 1 ? color = "\e[34mblue\e[0m" : color = "\e[31mred\e[0m"
-    puts "Player #{player_num}, what is your name?"
+    puts "\nPlayer #{player_num}, what is your name?"
+    puts "(enter 'cpu' if you want the computer to play)"
     name = ""
     name = gets.chomp until name != ""
-    puts "#{name}, you are team #{player_num}, and your team color is #{color}!\n\n"
+    if name == "cpu" && player_num == 1
+      name = "cpu_1"
+    elsif name == "cpu" && player_num == 2
+      name = "cpu_2"
+    end
+    puts "\n#{name}, you are team #{player_num}, and your team color is #{color}!\n\n"
     return Player.new(name)
     #sleep 1
   end
@@ -264,7 +270,6 @@ class Game < GamePiece
         end
       end
     end
-    binding.pry
     king.moves.each do |move|
       check_mate_spaces.include?(move) ? result = true : result = false
     end
@@ -369,8 +374,6 @@ class Game < GamePiece
       @king_2 = find_king(@player_2)
     end
 
-    binding.pry
-
     until checkmate?
       @board.display_board
       break if stalemate?
@@ -379,8 +382,14 @@ class Game < GamePiece
       break if quit_game?
 
     # get piece
-      piece_board_index = get_piece
-      piece = @board.board[piece_board_index].value
+      piece_moves = []
+      until !piece_moves.empty?
+        piece_board_index = get_piece
+        piece = @board.board[piece_board_index].value
+        delete_moves(piece)
+        piece_moves = piece.moves
+      end
+      
 
     # calc piece moves
       if piece.name == "pawn"
@@ -411,7 +420,12 @@ class Game < GamePiece
         end
       elsif piece.name == "king"
         puts "Do you want to Castle? Yes or No"
-        answer = gets.chomp.downcase until answer == "yes" || answer == "no" || answer == "y" || answer == "n"
+        @is_player_1 ? player = @player_1 : player = @player_2
+        if player.name == "cpu_1" || player.name == "cpu_2"
+          answer = "n"
+        else
+          answer = gets.chomp.downcase until answer == "yes" || answer == "no" || answer == "y" || answer == "n"
+        end
         if answer == "yes" || answer == "y"
           castle(piece)
           answer = ""
@@ -428,12 +442,14 @@ class Game < GamePiece
     # check move
       if piece.name == "knight"
         until check_move?(piece, move_to_space)
+          piece.moves.delete(move_to_space)
           move_to_space = re_run_check(piece)
           break if move_to_space.nil?
         end
         next if move_to_space.nil?
       else
         until check_move?(piece, move_to_space) && check_path?(piece.space, move_to_space)
+          piece.moves.delete(move_to_space)
           move_to_space = re_run_check(piece)
           break if move_to_space.nil?
         end
@@ -470,15 +486,16 @@ class Game < GamePiece
   end
 
   def get_piece
-    @is_player_1 ? match_color = "red" : match_color = "blue"
+    @is_player_1 ? match_color = "red" : match_color = "blue" # start as not matching to begin loop
     @is_player_1 ? player = @player_1 : player = @player_2
+    return get_piece_cpu(player) if player.name == "cpu_1" || player.name == "cpu_2"
     until match_color == player.color
       puts "\n#{player.name}, for the piece you would like to move, what is the column?"
       column = get_column
       next if column == 'back'
-      #sleep 1
+      sleep 1
       puts "\n#{player.name}, for the piece you would like to move, what is the row?"
-      #sleep 1
+      sleep 1
       row = get_row
       space = [column, row]
       board_index = BOARD_MAPPING[space]
@@ -486,6 +503,17 @@ class Game < GamePiece
       puts "\nPlease select a piece on your team." if match_color != player.color
     end
     return board_index
+  end
+
+  def get_piece_cpu(player)
+    cell = @board.board.sample
+    until !cell.value.nil? && cell.value.color == player.color && !cell.value.moves.nil?
+      cell = @board.board.sample
+    end
+    space = [COLUMN_MAPPING.key(cell.space[0]), ROW_MAPPING.key(cell.space[1])]
+    puts "\n#{player.name}'s piece selected is #{cell.value.name} at space #{space}."
+    sleep 1
+    return BOARD_MAPPING[cell.space]
   end
 
   def display_moves(piece)
@@ -501,8 +529,9 @@ class Game < GamePiece
     puts display_moves
   end
 
-  def get_move(piece)(piece)
+  def get_move(piece)
     @is_player_1 ? player = @player_1 : player = @player_2
+    return get_move_cpu(piece, player) if player.name == "cpu_1" || player.name == "cpu_2"
     destination = "some space"
     until piece.moves.include?(destination)
       puts "\n#{player.name}, for the space you would like to move to, what is the column?"
@@ -519,11 +548,19 @@ class Game < GamePiece
     return space
   end
 
+  def get_move_cpu(piece, player)
+    move = piece.moves.sample
+    space = [COLUMN_MAPPING.key(move[0]), ROW_MAPPING.key(move[1])]
+    puts "\n#{player.name}'s selected move is #{space}."
+    sleep 1
+    return move
+  end
+
   def re_run_check(piece)
     @is_player_1 ? player = @player_1 : player = @player_2
+    @board.display_board
     puts "\nThat move isn't legal, please enter a legal move."
     puts "To choose a different piece, type 'back'."
-    @board.display_board
     move_board_space = get_move(piece)
     if move_board_space.nil?
       return nil
@@ -538,21 +575,21 @@ class Game < GamePiece
 
   def check_path?(start, target)
     steps = [target[0] - start[0], target [1] - start[1]]
-    #p "steps #{steps}"
+    # p "steps #{steps}"
     path = [(0..steps[0]).to_a, (0..steps[1]).to_a]
     path[0] = (steps[0]..0).to_a if steps[0] < 0
     path[1] = (steps[1]..0).to_a if steps[1] < 0
-    #p "path #{path}"
+    # p "path #{path}"
     steps.max.abs > steps.min.abs ? n = steps.max.abs - 1 : n = steps.min.abs - 1
-    #p "n #{n}"
+    # p "n #{n}"
     check_space = start.clone
-    #p "check_space #{check_space}"
+    # p "check_space #{check_space}"
     for i in 1..n do
       check_space[0] = start[0] + path[0][i] if !path[0][i].nil?
       check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
-      #p "check_space looped #{check_space}"
+      # p "check_space looped #{check_space}"
       next if check_space == target
-      # binding.pry
+      binding.pry
       cell = @board.board[BOARD_MAPPING[check_space]].clone
       check_space_value = cell.value
       return false if !check_space_value.nil?
@@ -735,5 +772,4 @@ class Game < GamePiece
   end
 end
 
-test = Game.new
-test.play
+Game.new.play
