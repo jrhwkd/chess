@@ -355,7 +355,7 @@ class Game < GamePiece
   def end_game_winner
     @board.display_board
     @is_player_1 ? player = @player_1 : player = @player_2
-    puts "\nCheckmate!\n\nPlayer #{player.name} wins!"
+    puts "\nCheckmate!\n\n#{player.name} wins!"
   end
 
   def play
@@ -404,7 +404,8 @@ class Game < GamePiece
         # promotion
         @is_player_1 ? last_space = 7 : last_space = 0
         if move_to_space[1] == last_space
-          promotion(piece)
+          promotion(move_to_space)
+          @board.board[piece_board_index].value = nil
           switch_player
           next
         end
@@ -443,6 +444,7 @@ class Game < GamePiece
       update_board(piece, move_to_space) if !move_to_space.nil?  
 
       break if dead?
+      break if checkmate?
       check?
 
       switch_player
@@ -601,21 +603,21 @@ class Game < GamePiece
   def promotion(move_to_space)
     puts "\nPawn has been promoted!"
     puts "What would you like pawn to be promoted to?"
-    puts "Enter: queen, bishop, knight, or rook"
     promoted_to = ""
     until promoted_to == "queen" || promoted_to == "knight" || promoted_to == "bishop" || promoted_to == "rook"
+      puts "Enter: queen, bishop, knight, or rook"
       promoted_to = gets.chomp.downcase
     end
-    cell_value = @board.board[BOARD_MAPPING[move_to_space]].value
+    move_to_index = BOARD_MAPPING[move_to_space]
     case promoted_to
     when "queen"
-      cell_value = Queen.new(move_to_space, @is_player_1)
+      @board.board[move_to_index].value = Queen.new(move_to_space, @is_player_1)
     when "bishop"
-      cell_value = Bishop.new(move_to_space, @is_player_1)
+      @board.board[move_to_index].value = Bishop.new(move_to_space, @is_player_1)
     when "knight"
-      cell_value = Knight.new(move_to_space, @is_player_1)
+      @board.board[move_to_index].value = Knight.new(move_to_space, @is_player_1)
     when "rook"
-      cell_value = Rook.new(move_to_space, @is_player_1)
+      @board.board[move_to_index].value = Rook.new(move_to_space, @is_player_1)
     end
   end
 
