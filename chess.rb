@@ -137,6 +137,85 @@ class Game < GamePiece
     @king_2
   end
   
+  def play
+    introduction
+    if !load_game
+      @board = Board.new
+      @player_1 = get_player(1)
+      @player_2 = get_player(2)
+      @players = [@player_1, @player_2]
+      @king_1 = find_king(@player_1)
+      @king_2 = find_king(@player_2)
+    end
+
+    until checkmate?
+      @board.display_board
+      sleep 5
+      break if stalemate?
+
+      if @player_1.name != "cpu_1" && @player_2.name != "cpu_2"
+        save_game_check
+        break if quit_game?
+      end
+
+    # get piece
+      piece_moves = []
+      until !piece_moves.empty?
+        piece_board_index = get_piece
+        piece = @board.board[piece_board_index].value
+        
+        # calc piece moves
+        if piece.name == "pawn"
+          calc_pawn_moves(piece)
+        else
+          piece.moves = calc_moves(piece.space, piece.all_moves)
+        end
+        
+        # delete illegal moves
+        delete_moves(piece)
+        piece_moves = piece.moves
+      end
+
+      display_piece(piece)
+      display_moves(piece)
+
+    # get move
+      if piece.name == "pawn"
+        move_to_space = get_move(piece)
+        next if move_to_space.nil?
+        if piece.enpassant_moves.include?(move_to_space)
+          update_board_enpassant(piece, move_to_space)
+          switch_player
+          next
+        end
+        # promotion
+        @is_player_1 ? last_space = 7 : last_space = 0
+        if move_to_space[1] == last_space
+          promotion(move_to_space)
+          @board.board[piece_board_index].value = nil
+          switch_player
+          next
+        end
+      elsif piece.name == "king"
+        castle(piece) if check_castling
+      else
+        move_to_space = get_move(piece)
+        next if move_to_space.nil?
+      end
+
+    # update board
+      update_board(piece, move_to_space) if !move_to_space.nil?  
+
+      break if dead?
+      break if checkmate?
+      check?
+
+      switch_player
+    end
+    end_game_winner if checkmate?
+    end_game_draw if stalemate? || dead?
+  end 
+
   def introduction
     puts "\nLet's play Chess!\n\n"
   end
@@ -365,111 +444,6 @@ class Game < GamePiece
     @board.display_board
     @is_player_1 ? player = @player_1 : player = @player_2
     puts "\nCheckmate!\n\n#{player.name} wins!"
-  end
-
-  def play
-    introduction
-    if !load_game
-      @board = Board.new
-      @player_1 = get_player(1)
-      @player_2 = get_player(2)
-      @players = [@player_1, @player_2]
-      @king_1 = find_king(@player_1)
-      @king_2 = find_king(@player_2)
-    end
-
-    until checkmate?
-      @board.display_board
-      break if stalemate?
-
-      save_game_check
-      break if quit_game?
-
-    # get piece
-      piece_moves = []
-      until !piece_moves.empty?
-        piece_board_index = get_piece
-        piece = @board.board[piece_board_index].value
-        
-        # calc piece moves
-        if piece.name == "pawn"
-          calc_pawn_moves(piece)
-        else
-          piece.moves = calc_moves(piece.space, piece.all_moves)
-        end
-        
-        # delete illegal moves
-        delete_moves(piece)
-        display_moves(piece)
-        piece_moves = piece.moves
-      end
-
-    # get move
-      if piece.name == "pawn"
-        move_to_space = get_move(piece)
-        next if move_to_space.nil?
-        if piece.enpassant_moves.include?(move_to_space)
-          update_board_enpassant(piece, move_to_space)
-          switch_player
-          next
-        end
-        # promotion
-        @is_player_1 ? last_space = 7 : last_space = 0
-        if move_to_space[1] == last_space
-          promotion(move_to_space)
-          @board.board[piece_board_index].value = nil
-          switch_player
-          next
-        end
-      elsif piece.name == "king"
-        puts "Do you want to Castle? Yes or No"
-        @is_player_1 ? player = @player_1 : player = @player_2
-        if player.name == "cpu_1" || player.name == "cpu_2"
-          answer = "n"
-        else
-          answer = gets.chomp.downcase until answer == "yes" || answer == "no" || answer == "y" || answer == "n"
-        end
-        if answer == "yes" || answer == "y"
-          castle(piece)
-          answer = ""
-          next if !castle
-        else
-          move_to_space = get_move(piece)
-          next if move_to_space.nil?
-        end
-      else
-        move_to_space = get_move(piece)
-        next if move_to_space.nil?
-      end
-
-    # check move
-      if piece.name == "knight"
-        until check_move?(piece, move_to_space)
-          piece.moves.delete(move_to_space)
-          move_to_space = re_run_check(piece)
-          break if move_to_space.nil?
-        end
-        next if move_to_space.nil?
-      else
-        until check_move?(piece, move_to_space) && check_path?(piece.space, move_to_space)
-          piece.moves.delete(move_to_space)
-          move_to_space = re_run_check(piece)
-          break if move_to_space.nil?
-        end
-        next if move_to_space.nil?
-      end
-
-    # update board
-      update_board(piece, move_to_space) if !move_to_space.nil?  
-
-      break if dead?
-      break if checkmate?
-      check?
-
-      switch_player
-    end
-    end_game_winner if checkmate?
-    end_game_draw if stalemate? || dead?
   end 
 
   def get_column
@@ -496,9 +470,9 @@ class Game < GamePiece
       puts "\n#{player.name}, for the piece you would like to move, what is the column?"
       column = get_column
       next if column == 'back'
-      sleep 1
+      # sleep 1
       puts "\n#{player.name}, for the piece you would like to move, what is the row?"
-      sleep 1
+      # sleep 1
       row = get_row
       space = [column, row]
       board_index = BOARD_MAPPING[space]
@@ -514,9 +488,23 @@ class Game < GamePiece
       cell = @board.board.sample
     end
     space = [COLUMN_MAPPING.key(cell.space[0]), ROW_MAPPING.key(cell.space[1])]
-    puts "\n#{player.name}'s piece selected is #{cell.value.name} at space #{space}."
-    sleep 1
     return BOARD_MAPPING[cell.space]
+  end
+
+  def display_piece(piece)
+    @is_player_1 ? player = @player_1 : player = @player_2
+    space = [COLUMN_MAPPING.key(piece.space[0]), ROW_MAPPING.key(piece.space[1])]
+    puts "\n#{player.name}'s piece selected is #{piece.name} at space #{space}."
+    sleep 1
+  end
+
+  def check_if_cpu
+    @is_player_1 ? player = @player_1 : player = @player_2
+    if player.name == "cpu_1" || player.name == "cpu_2"
+      return true
+    else
+      return false
+    end
   end
 
   def display_moves(piece)
@@ -529,6 +517,7 @@ class Game < GamePiece
       moves.push(display_move)
     end
     moves.each { |move| display_moves += " #{move}" }
+    @board.display_board
     puts display_moves
   end
 
@@ -540,13 +529,14 @@ class Game < GamePiece
       puts "\n#{player.name}, for the space you would like to move to, what is the column?"
       column = get_column
       break if column == 'back'
-      #sleep 1
+      # sleep 1
       puts "\n#{player.name}, for the space you would like to move to, what is the row?"
-      #sleep 1
+      # sleep 1
       row = get_row
       space = [column, row]
       board_index = BOARD_MAPPING[space]
       destination = @board.board[board_index].space
+      puts "Please select a legal move!" if !piece.moves.include?(destination)
     end
     return space
   end
@@ -557,23 +547,6 @@ class Game < GamePiece
     puts "\n#{player.name}'s selected move is #{space}."
     sleep 1
     return move
-  end
-
-  def re_run_check(piece)
-    @is_player_1 ? player = @player_1 : player = @player_2
-    @board.display_board
-    puts "\nThat move isn't legal, please enter a legal move."
-    puts "To choose a different piece, type 'back'."
-    move_board_space = get_move(piece)
-    if move_board_space.nil?
-      return nil
-    else
-      return move_board_space
-    end
-  end
-
-  def check_move?(start, target)
-    start.moves.include?(target) ? true : false
   end
 
   def check_path?(start, target)
@@ -592,7 +565,6 @@ class Game < GamePiece
       check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
       # p "check_space looped #{check_space}"
       next if check_space == target
-      # binding.pry
       cell = @board.board[BOARD_MAPPING[check_space]].clone
       check_space_value = cell.value
       return false if !check_space_value.nil?
@@ -643,10 +615,16 @@ class Game < GamePiece
   def promotion(move_to_space)
     puts "\nPawn has been promoted!"
     puts "What would you like pawn to be promoted to?"
+    options = ["queen", "bishop", "knight", "rook"]
     promoted_to = ""
-    until promoted_to == "queen" || promoted_to == "knight" || promoted_to == "bishop" || promoted_to == "rook"
+    until options.include?(promoted_to)
       puts "Enter: queen, bishop, knight, or rook"
-      promoted_to = gets.chomp.downcase
+      @is_player_1 ? player = @player_1 : player = @player_2
+      if player.name == "cpu_1" || player.name == "cpu_2"
+        promoted_to = options.sample
+      else
+        promoted_to = gets.chomp.downcase
+      end
     end
     move_to_index = BOARD_MAPPING[move_to_space]
     case promoted_to
@@ -676,23 +654,39 @@ class Game < GamePiece
 
   # special case - castling
 
+  def castle(piece)
+    puts "Do you want to Castle? Yes or No"
+    @is_player_1 ? player = @player_1 : player = @player_2
+    if player.name == "cpu_1" || player.name == "cpu_2"
+      answer = ["y", "n"].sample
+    else
+      answer = gets.chomp.downcase until answer == "yes" || answer == "no" || answer == "y" || answer == "n"
+    end
+    if answer == "yes" || answer == "y"
+      update_board_castle(piece)
+      answer = ""
+    else
+      move_to_space = get_move(piece)
+    end
+  end
+
   def check_castling
     if @is_player_1
       if @board.board[4].value.moved
-        puts "Cannot castle King, King already moved."
+        #puts "Cannot castle King, King already moved."
         return false
       elsif @board.board[0].value.moved || @board.board[7].value.moved
-        puts "Cannot castle King, Rook has moved."
+        #puts "Cannot castle King, Rook has moved."
         return false
       else
         return true
       end
     else
       if @board.board[60].value.moved
-        puts "Cannot castle King, King has moved."
+        #puts "Cannot castle King, King has moved."
         return false
       elsif @board.board[56].value.moved || @board.board[63].value.moved
-        puts "Cannot castle King, Rook has moved."
+        #puts "Cannot castle King, Rook has moved."
         return false
       else
         return true
@@ -736,8 +730,7 @@ class Game < GamePiece
     end
   end
 
-  def castle(piece)
-    return if !check_castling
+  def update_board_castle(piece)
     puts "Select Rook column:"
     column = gets.chomp until column == 'a' || column == 'h'
     mapped_column = COLUMN_MAPPING[column]
