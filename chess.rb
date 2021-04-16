@@ -329,21 +329,25 @@ class Game < GamePiece
   end
 
   def delete_moves(piece)
+    legal_moves = []
      if !piece.moves.nil? 
       piece.moves.each do |move|
-        if piece.name != "knight" && !check_path?(piece.space, move)
-          piece.moves.delete(move)
-        end
+        next if move == piece.space
         if !@board.board[BOARD_MAPPING[move]].value.nil?
-          if @board.board[BOARD_MAPPING[move]].value.color == piece.color
-            piece.moves.delete(move)
-          end
+          next if @board.board[BOARD_MAPPING[move]].value.color == piece.color
         end
-        if piece.name == "king"
-          @board.board.each do |cell|
-            if !cell.value.nil?
-              if cell.value.color != piece.color && !cell.value.moves.nil? && cell.value.moves.include?(move)
-                piece.moves.delete(move)
+        if piece.name != "knight"
+          next if !check_path?(piece.space, move)
+        end
+        legal_moves.push(move)
+      end
+      piece.moves = legal_moves
+      if piece.name == "king"
+        @board.board.each do |cell|
+          if !cell.value.nil?
+            if cell.value.color != piece.color && !cell.value.moves.nil?
+              cell.value.moves.each do |move|
+                piece.moves.delete(move) if piece.moves.include?(move)
               end
             end
           end
@@ -386,20 +390,19 @@ class Game < GamePiece
       until !piece_moves.empty?
         piece_board_index = get_piece
         piece = @board.board[piece_board_index].value
+        
+        # calc piece moves
+        if piece.name == "pawn"
+          calc_pawn_moves(piece)
+        else
+          piece.moves = calc_moves(piece.space, piece.all_moves)
+        end
+        
+        # delete illegal moves
         delete_moves(piece)
+        display_moves(piece)
         piece_moves = piece.moves
       end
-      
-
-    # calc piece moves
-      if piece.name == "pawn"
-        calc_pawn_moves(piece)
-      else
-        piece.moves = calc_moves(piece.space, piece.all_moves)
-      end
-      
-      delete_moves(piece)
-      display_moves(piece)
 
     # get move
       if piece.name == "pawn"
@@ -589,7 +592,7 @@ class Game < GamePiece
       check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
       # p "check_space looped #{check_space}"
       next if check_space == target
-      binding.pry
+      # binding.pry
       cell = @board.board[BOARD_MAPPING[check_space]].clone
       check_space_value = cell.value
       return false if !check_space_value.nil?
