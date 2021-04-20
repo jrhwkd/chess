@@ -158,7 +158,7 @@ class Game < GamePiece
         break if quit_game?
       end
 
-    # get piece
+    # get piece player wants to move
       piece_moves = []
       until !piece_moves.empty?
         piece_board_index = get_piece
@@ -179,7 +179,7 @@ class Game < GamePiece
       display_piece(piece)
       display_moves(piece)
 
-    # get move
+    # get space where player wants to move to
       if piece.name == "pawn"
         move_to_space = get_move(piece)
         next if move_to_space.nil?
@@ -188,7 +188,7 @@ class Game < GamePiece
           switch_player
           next
         end
-        # promotion
+        # promotion - special case
         @is_player_1 ? last_space = 7 : last_space = 0
         if move_to_space[1] == last_space
           promotion(move_to_space)
@@ -284,11 +284,8 @@ class Game < GamePiece
     puts "(enter 'cpu' if you want the computer to play)"
     name = ""
     name = gets.chomp until name != ""
-    if name == "cpu" && player_num == 1
-      name = "cpu_1"
-    elsif name == "cpu" && player_num == 2
-      name = "cpu_2"
-    end
+    name = "cpu_1" if name == "cpu" && player_num == 1
+    name = "cpu_2" if name == "cpu" && player_num == 2
     puts "\n#{name}, you are team #{player_num}, and your team color is #{color}!\n\n"
     return Player.new(name)
     #sleep 1
@@ -304,6 +301,238 @@ class Game < GamePiece
         return cell.value if cell.value.name == 'king' && cell.value.color == player.color
       end
     end
+  end
+
+  def delete_moves(piece)
+    legal_moves = []
+     if !piece.moves.nil? 
+      piece.moves.each do |move|
+        next if move == piece.space
+        if !@board.board[BOARD_MAPPING[move]].value.nil?
+          next if @board.board[BOARD_MAPPING[move]].value.color == piece.color
+        end
+        if piece.name != "knight"
+          next if !check_path?(piece.space, move)
+        end
+        legal_moves.push(move)
+      end
+      piece.moves = legal_moves
+      if piece.name == "king"
+        @board.board.each do |cell|
+          if !cell.value.nil?
+            if cell.value.color != piece.color && !cell.value.moves.nil?
+              cell.value.moves.each do |move|
+                piece.moves.delete(move) if piece.moves.include?(move)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def get_column
+    column_input = gets.chomp.downcase until COLUMN_MAPPING.keys.include?(column_input) || column_input == 'back'
+    if column_input == 'back'
+      column = 'back'
+    else
+      column = COLUMN_MAPPING[column_input]
+    end
+    return column
+  end
+
+  def get_row
+    row_input = gets.chomp.to_i until ROW_MAPPING.keys.include?(row_input)
+    row = ROW_MAPPING[row_input]
+    return row
+  end
+
+  def get_piece
+    @is_player_1 ? match_color = "red" : match_color = "blue" # start as not matching to begin loop
+    @is_player_1 ? player = @player_1 : player = @player_2
+    return get_piece_cpu(player) if player.name == "cpu_1" || player.name == "cpu_2"
+    until match_color == player.color
+      puts "\n#{player.name}, for the piece you would like to move, what is the column?"
+      column = get_column
+      next if column == 'back'
+      # sleep 1
+      puts "\n#{player.name}, for the piece you would like to move, what is the row?"
+      # sleep 1
+      row = get_row
+      space = [column, row]
+      board_index = BOARD_MAPPING[space]
+      match_color = @board.board[board_index].value.color if !@board.board[board_index].value.nil?
+      puts "\nPlease select a piece on your team." if match_color != player.color
+    end
+    return board_index
+  end
+
+  def get_piece_cpu(player)
+    cell = @board.board.sample
+    until !cell.value.nil? && cell.value.color == player.color && !cell.value.moves.nil?
+      cell = @board.board.sample
+    end
+    space = [COLUMN_MAPPING.key(cell.space[0]), ROW_MAPPING.key(cell.space[1])]
+    return BOARD_MAPPING[cell.space]
+  end
+
+  def display_piece(piece)
+    @is_player_1 ? player = @player_1 : player = @player_2
+    space = [COLUMN_MAPPING.key(piece.space[0]), ROW_MAPPING.key(piece.space[1])]
+    puts "\n#{player.name}'s selected piece is #{piece.name} at space #{space}."
+    sleep 1
+  end
+
+  def check_if_cpu
+    @is_player_1 ? player = @player_1 : player = @player_2
+    if player.name == "cpu_1" || player.name == "cpu_2"
+      return true
+    else
+      return false
+    end
+  end
+
+  def display_moves(piece)
+    moves = []
+    display_moves = "\n#{piece.name} moves are: "
+    piece.moves.each do |move|
+      display_move = []
+      display_move.push(COLUMN_MAPPING.key(move[0]))
+      display_move.push(ROW_MAPPING.key(move[1]))
+      moves.push(display_move)
+    end
+    moves.each { |move| display_moves += " #{move}" }
+    @board.display_board
+    puts display_moves
+  end
+
+  def get_move(piece)
+    @is_player_1 ? player = @player_1 : player = @player_2
+    return get_move_cpu(piece, player) if player.name == "cpu_1" || player.name == "cpu_2"
+    destination = "some space"
+    until piece.moves.include?(destination)
+      puts "\n#{player.name}, for the space you would like to move to, what is the column?"
+      column = get_column
+      break if column == 'back'
+      # sleep 1
+      puts "\n#{player.name}, for the space you would like to move to, what is the row?"
+      # sleep 1
+      row = get_row
+      space = [column, row]
+      board_index = BOARD_MAPPING[space]
+      destination = @board.board[board_index].space
+      puts "Please select a legal move!" if !piece.moves.include?(destination)
+    end
+    return space
+  end
+
+  def get_move_cpu(piece, player)
+    move = piece.moves.sample
+    space = [COLUMN_MAPPING.key(move[0]), ROW_MAPPING.key(move[1])]
+    puts "\n#{player.name}'s selected move is #{space}."
+    sleep 1
+    return move
+  end
+
+  def check_path?(start, target)
+    steps = [target[0] - start[0], target [1] - start[1]]
+    path = [(0..steps[0]).to_a, (0..steps[1]).to_a]
+    path[0] = (steps[0]..0).to_a if steps[0] < 0
+    path[1] = (steps[1]..0).to_a if steps[1] < 0
+    steps.max.abs > steps.min.abs ? n = steps.max.abs - 1 : n = steps.min.abs - 1
+    check_space = start.clone
+    for i in 1..n do
+      check_space[0] = start[0] + path[0][i] if !path[0][i].nil?
+      check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
+      next if check_space == target
+      cell = @board.board[BOARD_MAPPING[check_space]].clone
+      check_space_value = cell.value
+      return false if !check_space_value.nil?
+    end
+    return true
+  end
+
+  def calc_pawn_moves(piece)
+    piece.moves = calc_moves(piece.space, piece.all_moves)
+    piece.moves.each do |move| 
+      piece.moves.delete(move) if !@board.board[BOARD_MAPPING[move]].value.nil?
+    end
+    temp_all_attacks = calc_moves(piece.space, piece.all_attacks)
+    temp_all_attacks.each do |attack|
+      attack_cell = @board.board[BOARD_MAPPING[attack]]
+      if !attack_cell.value.nil? && attack_cell.value.color != piece.color
+        piece.moves.push(attack)
+      end
+    end
+
+    #en passant
+    piece_index = BOARD_MAPPING[piece.space]
+    adjacent_cell_right = @board.board[piece_index + 1].value
+    adjacent_cell_left = @board.board[piece_index - 1].value
+    @is_player_1 ? operator = 1 : operator = -1
+    @is_player_1 ? legal_row = 4 : legal_row = 5
+    if !adjacent_cell_right.nil? && adjacent_cell_right.color != piece.color && adjacent_cell_right.name == 'pawn' && adjacent_cell_right.num_of_moves == 1 && piece.space[1] == legal_row
+      piece.enpassant_moves.push([adjacent_cell_right.space[0], adjacent_cell_right.space[1] + operator])
+    end
+    if !adjacent_cell_left.nil? && adjacent_cell_left.color != piece.color && adjacent_cell_left.name == 'pawn' && adjacent_cell_left.num_of_moves == 1 && piece.space[1] == legal_row
+      piece.enpassant_moves.push([adjacent_cell_left.space[0], adjacent_cell_left.space[1] + operator])
+    end
+    (piece.enpassant_moves).each { |move| piece.moves.push(move) }
+    piece.moves = piece.moves.uniq
+  end
+
+  def update_board_enpassant(piece, move_to_space)
+    move_to_index = BOARD_MAPPING[move_to_space]
+    piece_index = BOARD_MAPPING[piece.space]
+    piece.num_of_moves += 1
+    @king_1 = find_king(@player_1)
+    @king_2 = find_king(@player_2)
+    piece.space = move_to_space
+    @board.board[move_to_index].value = piece
+    @board.board[piece_index].value = nil
+    @is_player_1 ? operator = -1 : operator = 1
+    p [move_to_space[0], move_to_space[1] + operator]
+    @board.board[BOARD_MAPPING[[move_to_space[0], move_to_space[1] + operator]]].value = nil
+  end
+
+  def promotion(move_to_space)
+    puts "\nPawn has been promoted!"
+    puts "What would you like pawn to be promoted to?"
+    options = ["queen", "bishop", "knight", "rook"]
+    promoted_to = ""
+    until options.include?(promoted_to)
+      puts "Enter: queen, bishop, knight, or rook"
+      @is_player_1 ? player = @player_1 : player = @player_2
+      if player.name == "cpu_1" || player.name == "cpu_2"
+        promoted_to = options.sample
+      else
+        promoted_to = gets.chomp.downcase
+      end
+    end
+    move_to_index = BOARD_MAPPING[move_to_space]
+    case promoted_to
+    when "queen"
+      @board.board[move_to_index].value = Queen.new(move_to_space, @is_player_1)
+    when "bishop"
+      @board.board[move_to_index].value = Bishop.new(move_to_space, @is_player_1)
+    when "knight"
+      @board.board[move_to_index].value = Knight.new(move_to_space, @is_player_1)
+    when "rook"
+      @board.board[move_to_index].value = Rook.new(move_to_space, @is_player_1)
+    end
+  end
+
+  def update_board(piece, move_to_space)
+    move_to_index = BOARD_MAPPING[move_to_space]
+    piece_index = BOARD_MAPPING[piece.space]
+    piece.moved == true if piece.name == "king"
+    piece.moved == true if piece.name == "rook"
+    piece.num_of_moves += 1 if piece.name == "pawn"
+    @king_1 = find_king(@player_1)
+    @king_2 = find_king(@player_2)
+    piece.space = move_to_space
+    @board.board[move_to_index].value = piece
+    @board.board[piece_index].value = nil
   end
 
   def check?
@@ -407,34 +636,6 @@ class Game < GamePiece
     end
   end
 
-  def delete_moves(piece)
-    legal_moves = []
-     if !piece.moves.nil? 
-      piece.moves.each do |move|
-        next if move == piece.space
-        if !@board.board[BOARD_MAPPING[move]].value.nil?
-          next if @board.board[BOARD_MAPPING[move]].value.color == piece.color
-        end
-        if piece.name != "knight"
-          next if !check_path?(piece.space, move)
-        end
-        legal_moves.push(move)
-      end
-      piece.moves = legal_moves
-      if piece.name == "king"
-        @board.board.each do |cell|
-          if !cell.value.nil?
-            if cell.value.color != piece.color && !cell.value.moves.nil?
-              cell.value.moves.each do |move|
-                piece.moves.delete(move) if piece.moves.include?(move)
-              end
-            end
-          end
-        end
-      end
-    end
-  end
-
   def end_game_draw
     @board.display_board
     puts "Game ends in a draw."
@@ -445,212 +646,6 @@ class Game < GamePiece
     @is_player_1 ? player = @player_1 : player = @player_2
     puts "\nCheckmate!\n\n#{player.name} wins!"
   end 
-
-  def get_column
-    column_input = gets.chomp.downcase until COLUMN_MAPPING.keys.include?(column_input) || column_input == 'back'
-    if column_input == 'back'
-      column = 'back'
-    else
-      column = COLUMN_MAPPING[column_input]
-    end
-    return column
-  end
-
-  def get_row
-    row_input = gets.chomp.to_i until ROW_MAPPING.keys.include?(row_input)
-    row = ROW_MAPPING[row_input]
-    return row
-  end
-
-  def get_piece
-    @is_player_1 ? match_color = "red" : match_color = "blue" # start as not matching to begin loop
-    @is_player_1 ? player = @player_1 : player = @player_2
-    return get_piece_cpu(player) if player.name == "cpu_1" || player.name == "cpu_2"
-    until match_color == player.color
-      puts "\n#{player.name}, for the piece you would like to move, what is the column?"
-      column = get_column
-      next if column == 'back'
-      # sleep 1
-      puts "\n#{player.name}, for the piece you would like to move, what is the row?"
-      # sleep 1
-      row = get_row
-      space = [column, row]
-      board_index = BOARD_MAPPING[space]
-      match_color = @board.board[board_index].value.color if !@board.board[board_index].value.nil?
-      puts "\nPlease select a piece on your team." if match_color != player.color
-    end
-    return board_index
-  end
-
-  def get_piece_cpu(player)
-    cell = @board.board.sample
-    until !cell.value.nil? && cell.value.color == player.color && !cell.value.moves.nil?
-      cell = @board.board.sample
-    end
-    space = [COLUMN_MAPPING.key(cell.space[0]), ROW_MAPPING.key(cell.space[1])]
-    return BOARD_MAPPING[cell.space]
-  end
-
-  def display_piece(piece)
-    @is_player_1 ? player = @player_1 : player = @player_2
-    space = [COLUMN_MAPPING.key(piece.space[0]), ROW_MAPPING.key(piece.space[1])]
-    puts "\n#{player.name}'s piece selected is #{piece.name} at space #{space}."
-    sleep 1
-  end
-
-  def check_if_cpu
-    @is_player_1 ? player = @player_1 : player = @player_2
-    if player.name == "cpu_1" || player.name == "cpu_2"
-      return true
-    else
-      return false
-    end
-  end
-
-  def display_moves(piece)
-    moves = []
-    display_moves = "\n#{piece.name} moves are: "
-    piece.moves.each do |move|
-      display_move = []
-      display_move.push(COLUMN_MAPPING.key(move[0]))
-      display_move.push(ROW_MAPPING.key(move[1]))
-      moves.push(display_move)
-    end
-    moves.each { |move| display_moves += " #{move}" }
-    @board.display_board
-    puts display_moves
-  end
-
-  def get_move(piece)
-    @is_player_1 ? player = @player_1 : player = @player_2
-    return get_move_cpu(piece, player) if player.name == "cpu_1" || player.name == "cpu_2"
-    destination = "some space"
-    until piece.moves.include?(destination)
-      puts "\n#{player.name}, for the space you would like to move to, what is the column?"
-      column = get_column
-      break if column == 'back'
-      # sleep 1
-      puts "\n#{player.name}, for the space you would like to move to, what is the row?"
-      # sleep 1
-      row = get_row
-      space = [column, row]
-      board_index = BOARD_MAPPING[space]
-      destination = @board.board[board_index].space
-      puts "Please select a legal move!" if !piece.moves.include?(destination)
-    end
-    return space
-  end
-
-  def get_move_cpu(piece, player)
-    move = piece.moves.sample
-    space = [COLUMN_MAPPING.key(move[0]), ROW_MAPPING.key(move[1])]
-    puts "\n#{player.name}'s selected move is #{space}."
-    sleep 1
-    return move
-  end
-
-  def check_path?(start, target)
-    steps = [target[0] - start[0], target [1] - start[1]]
-    # p "steps #{steps}"
-    path = [(0..steps[0]).to_a, (0..steps[1]).to_a]
-    path[0] = (steps[0]..0).to_a if steps[0] < 0
-    path[1] = (steps[1]..0).to_a if steps[1] < 0
-    # p "path #{path}"
-    steps.max.abs > steps.min.abs ? n = steps.max.abs - 1 : n = steps.min.abs - 1
-    # p "n #{n}"
-    check_space = start.clone
-    # p "check_space #{check_space}"
-    for i in 1..n do
-      check_space[0] = start[0] + path[0][i] if !path[0][i].nil?
-      check_space[1] = start[1] + path[1][i] if !path[1][i].nil?
-      # p "check_space looped #{check_space}"
-      next if check_space == target
-      cell = @board.board[BOARD_MAPPING[check_space]].clone
-      check_space_value = cell.value
-      return false if !check_space_value.nil?
-    end
-    return true
-  end
-
-  def calc_pawn_moves(piece)
-    piece.moves = calc_moves(piece.space, piece.all_moves)
-    temp_all_attacks = calc_moves(piece.space, piece.all_attacks)
-    temp_all_attacks.each do |attack|
-      attack_cell = @board.board[BOARD_MAPPING[attack]]
-      if !attack_cell.value.nil? && attack_cell.value.color != piece.color
-        piece.moves.push(attack)
-      end
-    end
-
-    #en passant
-    piece_index = BOARD_MAPPING[piece.space]
-    adjacent_cell_right = @board.board[piece_index + 1].value
-    adjacent_cell_left = @board.board[piece_index - 1].value
-    @is_player_1 ? operator = 1 : operator = -1
-    @is_player_1 ? legal_row = 4 : legal_row = 5
-    if !adjacent_cell_right.nil? && adjacent_cell_right.color != piece.color && adjacent_cell_right.name == 'pawn' && adjacent_cell_right.num_of_moves == 1 && piece.space[1] == legal_row
-      piece.enpassant_moves.push([adjacent_cell_right.space[0], adjacent_cell_right.space[1] + operator])
-    end
-    if !adjacent_cell_left.nil? && adjacent_cell_left.color != piece.color && adjacent_cell_left.name == 'pawn' && adjacent_cell_left.num_of_moves == 1 && piece.space[1] == legal_row
-      piece.enpassant_moves.push([adjacent_cell_left.space[0], adjacent_cell_left.space[1] + operator])
-    end
-    (piece.enpassant_moves).each { |move| piece.moves.push(move) }
-    piece.moves = piece.moves.uniq
-  end
-
-  def update_board_enpassant(piece, move_to_space)
-    move_to_index = BOARD_MAPPING[move_to_space]
-    piece_index = BOARD_MAPPING[piece.space]
-    piece.num_of_moves += 1
-    @king_1 = find_king(@player_1)
-    @king_2 = find_king(@player_2)
-    piece.space = move_to_space
-    @board.board[move_to_index].value = piece
-    @board.board[piece_index].value = nil
-    @is_player_1 ? operator = -1 : operator = 1
-    p [move_to_space[0], move_to_space[1] + operator]
-    @board.board[BOARD_MAPPING[[move_to_space[0], move_to_space[1] + operator]]].value = nil
-  end
-
-  def promotion(move_to_space)
-    puts "\nPawn has been promoted!"
-    puts "What would you like pawn to be promoted to?"
-    options = ["queen", "bishop", "knight", "rook"]
-    promoted_to = ""
-    until options.include?(promoted_to)
-      puts "Enter: queen, bishop, knight, or rook"
-      @is_player_1 ? player = @player_1 : player = @player_2
-      if player.name == "cpu_1" || player.name == "cpu_2"
-        promoted_to = options.sample
-      else
-        promoted_to = gets.chomp.downcase
-      end
-    end
-    move_to_index = BOARD_MAPPING[move_to_space]
-    case promoted_to
-    when "queen"
-      @board.board[move_to_index].value = Queen.new(move_to_space, @is_player_1)
-    when "bishop"
-      @board.board[move_to_index].value = Bishop.new(move_to_space, @is_player_1)
-    when "knight"
-      @board.board[move_to_index].value = Knight.new(move_to_space, @is_player_1)
-    when "rook"
-      @board.board[move_to_index].value = Rook.new(move_to_space, @is_player_1)
-    end
-  end
-
-  def update_board(piece, move_to_space)
-    move_to_index = BOARD_MAPPING[move_to_space]
-    piece_index = BOARD_MAPPING[piece.space]
-    piece.moved == true if piece.name == "king"
-    piece.moved == true if piece.name == "rook"
-    piece.num_of_moves += 1 if piece.name == "pawn"
-    @king_1 = find_king(@player_1)
-    @king_2 = find_king(@player_2)
-    piece.space = move_to_space
-    @board.board[move_to_index].value = piece
-    @board.board[piece_index].value = nil
-  end
 
   # special case - castling
 
