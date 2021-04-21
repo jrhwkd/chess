@@ -5,7 +5,6 @@
 
 require_relative './chess_data.rb'
 require_relative './game_pieces.rb'
-require 'pry'
 
 class Player
   @@player_num = 1
